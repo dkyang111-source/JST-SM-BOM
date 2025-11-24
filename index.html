@@ -1,0 +1,250 @@
+Here's the Go equivalent of the provided React components. Since Go is a backend language, I'll implement these as HTML template components using Go's `html/template` package, which is the closest equivalent for generating UI components in Go:
+
+```go
+// Package components provides UI component rendering for web applications
+package components
+
+import (
+	"bytes"
+	"html/template"
+	"math"
+	"strconv"
+)
+
+// SimpleLineChartData represents data for the line chart
+type SimpleLineChartData struct {
+	Month string
+	In    float64
+	Out   float64
+}
+
+// SimpleLineChart renders a line chart component
+func SimpleLineChart(data []SimpleLineChartData) template.HTML {
+	// Find max value for scaling
+	maxVal := 1.0
+	for _, d := range data {
+		if d.In > maxVal {
+			maxVal = d.In
+		}
+		if d.Out > maxVal {
+			maxVal = d.Out
+		}
+	}
+
+	// Generate SVG points
+	var pointsIn bytes.Buffer
+	var pointsOut bytes.Buffer
+	var monthLabels bytes.Buffer
+	var circlesIn bytes.Buffer
+	var circlesOut bytes.Buffer
+
+	for i, d := range data {
+		if i > 0 {
+			pointsIn.WriteString(" ")
+			pointsOut.WriteString(" ")
+		}
+
+		x := i * 100
+		yIn := 150 - int((d.In/maxVal)*120)
+		yOut := 150 - int((d.Out/maxVal)*120)
+
+		pointsIn.WriteString(strconv.Itoa(x) + "," + strconv.Itoa(yIn))
+		pointsOut.WriteString(strconv.Itoa(x) + "," + strconv.Itoa(yOut))
+
+		monthLabels.WriteString(`<span class="text-xs text-slate-400">` + d.Month + `</span>`)
+		circlesIn.WriteString(`<circle cx="` + strconv.Itoa(x) + `" cy="` + strconv.Itoa(yIn) + `" r="4" fill="#3b82f6" class="hover:scale-150 transition-all origin-center" />`)
+		circlesOut.WriteString(`<circle cx="` + strconv.Itoa(x) + `" cy="` + strconv.Itoa(yOut) + `" r="4" fill="#ef4444" class="hover:scale-150 transition-all origin-center" />`)
+	}
+
+	// Create the SVG template
+	svg := `
+	<div class="w-full h-48 relative mt-4">
+		<svg class="w-full h-full overflow-visible" viewBox="0 0 500 150" preserveAspectRatio="none">
+			<line x1="0" y1="150" x2="500" y2="150" stroke="#e2e8f0" stroke-width="1" />
+			<line x1="0" y1="75" x2="500" y2="75" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 4" />
+			<polyline points="` + pointsIn.String() + `" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+			` + circlesIn.String() + `
+			<polyline points="` + pointsOut.String() + `" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+			` + circlesOut.String() + `
+		</svg>
+		<div class="flex justify-between mt-2">
+			` + monthLabels.String() + `
+		</div>
+		<div class="flex justify-center gap-4 mt-2 text-xs font-medium">
+			<div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-blue-500"></div>입고량</div>
+			<div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-red-500"></div>출고량</div>
+		</div>
+	</div>
+	`
+
+	return template.HTML(svg)
+}
+
+// DonutChart renders a donut chart component
+func DonutChart(percentage int, colorClass string) template.HTML {
+	if colorClass == "" {
+		colorClass = "text-blue-600"
+	}
+
+	radius := 30
+	circumference := 2 * math.Pi * float64(radius)
+	strokeDashoffset := circumference - (float64(percentage)/100)*circumference
+
+	svg := `
+	<div class="relative w-32 h-32 flex items-center justify-center">
+		<svg class="transform -rotate-90 w-full h-full">
+			<circle cx="50" cy="50" r="` + strconv.Itoa(radius) + `" stroke="currentColor" stroke-width="8" fill="transparent" class="text-slate-100" />
+			<circle cx="50" cy="50" r="` + strconv.Itoa(radius) + `" stroke="currentColor" stroke-width="8" fill="transparent"
+					stroke-dasharray="` + strconv.FormatFloat(circumference, 'f', -1, 64) + `"
+					stroke-dashoffset="` + strconv.FormatFloat(strokeDashoffset, 'f', -1, 64) + `"
+					class="` + colorClass + ` transition-all duration-1000 ease-out" stroke-linecap="round" />
+		</svg>
+		<div class="absolute flex flex-col items-center">
+			<span class="text-xl font-bold text-slate-800">` + strconv.Itoa(percentage) + `%</span>
+		</div>
+	</div>
+	`
+
+	return template.HTML(svg)
+}
+
+// InputFieldData represents data for an input field
+type InputFieldData struct {
+	Label       string
+	Name        string
+	Value       string
+	Type        string
+	ReadOnly    bool
+	Placeholder string
+	Required    bool
+	Align       string
+}
+
+// InputField renders an input field component
+func InputField(data InputFieldData) template.HTML {
+	if data.Type == "" {
+		data.Type = "text"
+	}
+	if data.Align == "" {
+		data.Align = "left"
+	}
+
+	requiredStar := ""
+	if data.Required {
+		requiredStar = `<span class="text-red-500">*</span>`
+	}
+
+	readonlyClass := "bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed"
+	normalClass := "bg-white border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-slate-400"
+
+	class := readonlyClass
+	if !data.ReadOnly {
+		class = normalClass
+	}
+
+	alignClass := "text-left"
+	if data.Align == "right" {
+		alignClass = "text-right"
+	}
+
+	html := `
+	<div class="flex flex-col gap-1.5">
+		<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+			` + data.Label + `
+			` + requiredStar + `
+		</label>
+		<input
+			type="` + data.Type + `"
+			name="` + data.Name + `"
+			value="` + data.Value + `"
+			` + func() string {
+		if data.ReadOnly {
+			return "readonly"
+		}
+		return ""
+	}() + `
+			placeholder="` + data.Placeholder + `"
+			class="px-3 py-2.5 rounded-lg border text-sm transition-all outline-none ` + alignClass + ` ` + class + `"
+		/>
+	</div>
+	`
+
+	return template.HTML(html)
+}
+
+// NavItemData represents data for a navigation item
+type NavItemData struct {
+	Icon    template.HTML
+	Label   string
+	IsOpen  bool
+	Active  bool
+	OnClick string
+}
+
+// NavItem renders a navigation item component
+func NavItem(data NavItemData) template.HTML {
+	activeClass := "bg-blue-600 text-white shadow-md"
+	inactiveClass := "text-slate-300 hover:bg-slate-800 hover:text-white"
+
+	class := inactiveClass
+	if data.Active {
+		class = activeClass
+	}
+
+	html := `
+	<button
+		onclick="` + data.OnClick + `"
+		class="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors duration-200 ` + class + `"
+	>
+		<span class="flex-shrink-0">` + data.Icon + `</span>
+		` + func() string {
+		if data.IsOpen {
+			return `<span class="text-sm font-medium whitespace-nowrap">` + data.Label + `</span>`
+		}
+		return ""
+	}() + `
+	</button>
+	`
+
+	return template.HTML(html)
+}
+```
+
+To use these components in a Go web application, you would typically:
+
+1. Import this package in your handlers
+2. Create data structures for each component
+3. Pass them to your templates
+
+Example usage in a handler:
+
+```go
+func chartHandler(w http.ResponseWriter, r *http.Request) {
+	data := []components.SimpleLineChartData{
+		{Month: "Jan", In: 100, Out: 80},
+		{Month: "Feb", In: 120, Out: 90},
+		{Month: "Mar", In: 150, Out: 110},
+	}
+
+	chart := components.SimpleLineChart(data)
+
+	tmpl := template.Must(template.New("chart").Parse(`
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<title>Chart Example</title>
+			<script src="https://cdn.tailwindcss.com"></script>
+		</head>
+		<body>
+			{{ .Chart | safeHTML }}
+		</body>
+		</html>
+	`))
+
+	tmpl.Execute(w, struct {
+		Chart template.HTML
+	}{
+		Chart: chart,
+	})
+}
+```
